@@ -5,7 +5,6 @@ import pdfplumber
 import dateparser
 import pandas as pd
 import spacy
-from spacy.cli import download
 
 # ---------------- CONFIG ----------------
 st.set_page_config(
@@ -90,16 +89,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------- LOAD NLP ----------------
-@st.cache_resource
-def load_spacy():
-    try:
-        nlp = spacy.load("en_core_web_sm")
-    except:
-        download("en_core_web_sm")
-        nlp = spacy.load("en_core_web_sm")
-    return nlp
-
-nlp = load_spacy()
+nlp = spacy.load("en_core_web_sm")
 
 # ---------------- FUNCTIONS ----------------
 def extract_text_from_pdf(pdf_path):
