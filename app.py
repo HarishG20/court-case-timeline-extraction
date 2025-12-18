@@ -4,7 +4,6 @@ import re
 import pdfplumber
 import dateparser
 import pandas as pd
-import spacy
 
 # ---------------- CONFIG ----------------
 st.set_page_config(
@@ -89,7 +88,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------- LOAD NLP ----------------
-nlp = spacy.load("en_core_web_sm")
+# spaCy has been removed; using regex-based text processing instead.
 
 # ---------------- FUNCTIONS ----------------
 def extract_text_from_pdf(pdf_path):
@@ -100,6 +99,12 @@ def extract_text_from_pdf(pdf_path):
             if page_text:
                 text += page_text + " "
     return text
+
+
+def split_sentences(text):
+    """Split text into sentences using regex, keeping only reasonably long sentences."""
+    sentences = re.split(r'(?<=[\.!\?])\s+', text)
+    return [s.strip() for s in sentences if len(s.strip()) > 20]
 
 
 def extract_date(sentence):
@@ -133,20 +138,11 @@ def detect_event(sentence):
     return "Other"
 
 
-def extract_person_names(text, nlp_model):
-    """Extract person names from text using Named Entity Recognition"""
-    doc = nlp_model(text)
+def extract_person_names(text):
+    """Heuristically extract person names from text using regex patterns (no spaCy required)."""
     person_names = set()
-    
-    for ent in doc.ents:
-        if ent.label_ == "PERSON":
-            # Clean up the name (remove extra spaces, capitalize properly)
-            name = ent.text.strip()
-            # Filter out very short names (likely false positives)
-            if len(name) > 2 and len(name.split()) <= 5:
-                person_names.add(name)
-    
-    # Also look for common patterns like "vs", "v.", "versus" for case parties
+
+    # Look for common patterns like "vs", "v.", "versus" for case parties
     vs_patterns = [
         r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:vs|v\.|versus|VS|V\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
         r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+and\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
@@ -159,33 +155,41 @@ def extract_person_names(text, nlp_model):
                 if group and len(group.strip()) > 2:
                     person_names.add(group.strip())
     
+    # Generic heuristic: sequences of capitalized words (likely names)
+    name_pattern = r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,4})\b'
+    for match in re.finditer(name_pattern, text):
+        name = match.group(1).strip()
+        if len(name) > 2:
+            person_names.add(name)
+
     return sorted(list(person_names))
 
 
-def extract_persons_from_sentence(sentence, nlp_model):
-    """Extract person names from a single sentence"""
-    doc = nlp_model(sentence)
-    persons = []
-    for ent in doc.ents:
-        if ent.label_ == "PERSON":
-            name = ent.text.strip()
-            if len(name) > 2 and len(name.split()) <= 5:
-                persons.append(name)
-    return list(set(persons))  # Remove duplicates
+def extract_persons_from_sentence(sentence):
+    """Heuristically extract person names from a single sentence (no spaCy required)."""
+    persons = set()
+
+    name_pattern = r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,4})\b'
+    for match in re.finditer(name_pattern, sentence):
+        name = match.group(1).strip()
+        if len(name) > 2:
+            persons.add(name)
+
+    return list(persons)
 
 
 def build_timeline(pdf_name):
     pdf_path = os.path.join(DATA_FOLDER, pdf_name)
     text = extract_text_from_pdf(pdf_path)
 
-    doc = nlp(text)
-    sentences = [sent.text.strip() for sent in doc.sents]
+    # Simple sentence splitting without spaCy
+    sentences = split_sentences(text)
 
     timeline = []
     for sent in sentences:
         date = extract_date(sent)
         if date:
-            persons_in_sent = extract_persons_from_sentence(sent, nlp)
+            persons_in_sent = extract_persons_from_sentence(sent)
             timeline.append({
                 "Date": date.strftime("%Y-%m-%d"),
                 "Event": detect_event(sent),
@@ -242,7 +246,7 @@ else:
             # Extract person names from the full document
             pdf_path = os.path.join(DATA_FOLDER, selected_pdf)
             full_text = extract_text_from_pdf(pdf_path)
-            person_names = extract_person_names(full_text, nlp)
+            person_names = extract_person_names(full_text)
 
         if df.empty:
             st.warning("⚠️ No dates/events detected in this document.")
