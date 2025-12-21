@@ -84,6 +84,13 @@ st.markdown("""
     .stSelectbox>div>div {
         border-radius: 8px;
     }
+    .dataframe-container {
+        overflow-x: auto;
+        width: 100%;
+    }
+    div[data-testid="stDataFrame"] {
+        overflow-x: auto;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -243,10 +250,6 @@ else:
     if generate_btn:
         with st.spinner("🔍 Processing document and extracting timeline events..."):
             df = build_timeline(selected_pdf)
-            # Extract person names from the full document
-            pdf_path = os.path.join(DATA_FOLDER, selected_pdf)
-            full_text = extract_text_from_pdf(pdf_path)
-            person_names = extract_person_names(full_text)
 
         if df.empty:
             st.warning("⚠️ No dates/events detected in this document.")
@@ -254,16 +257,6 @@ else:
         else:
             # Success message
             st.success(f"✅ Timeline extracted successfully for **{selected_pdf}**")
-            
-            # Parties/Persons Involved Section
-            if person_names:
-                st.markdown("### 👥 Parties Involved")
-                col1, col2, col3 = st.columns(3)
-                cols = [col1, col2, col3]
-                for idx, name in enumerate(person_names):
-                    with cols[idx % 3]:
-                        st.markdown(f"👤 **{name}**")
-                st.divider()
             
             # Statistics Cards
             st.markdown("### 📊 Timeline Statistics")
@@ -299,14 +292,14 @@ else:
             
             # Timeline Table
             st.markdown("### 📋 Timeline Overview")
-            # Configure column display for better readability
+            # Configure column display for better readability with horizontal scroll
             column_config = {
                 "Date": st.column_config.DateColumn("Date", width="small", format="YYYY-MM-DD"),
                 "Event": st.column_config.TextColumn("Event", width="medium"),
                 "Persons": st.column_config.TextColumn("Persons Involved", width="medium"),
                 "Description": st.column_config.TextColumn("Description", width="large")
             }
-            st.dataframe(df, use_container_width=True, column_config=column_config, hide_index=True)
+            st.dataframe(df, use_container_width=True, column_config=column_config, hide_index=True, height=400)
             
             st.divider()
             
